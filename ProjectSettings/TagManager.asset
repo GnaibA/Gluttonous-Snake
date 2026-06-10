@@ -41,3 +41,12 @@ TagManager:
   - name: Default
     uniqueID: 0
     locked: 0
+  - name: Ground
+    uniqueID: 3085422413
+    locked: 0
+  - name: Food
+    uniqueID: 2156640089
+    locked: 0
+  - name: Snake
+    uniqueID: 514118071
+    locked: 0
