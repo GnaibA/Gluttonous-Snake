@@ -9,9 +9,16 @@ public class GameManager : MonoBehaviour
 {
     private PlayerInput input;
 
-    [SerializeField] private int width;
-    [SerializeField] private int height;
+    [Header("设置")]
+    [SerializeField] public int width;
+    [SerializeField] public int height;
 
+    private float tickTimer;
+    [SerializeField] private float secondPerTick = .3f;
+
+    [SerializeField] private int initialBodyLen = 3;
+
+    [Header("资源")]
     [SerializeField] private Tilemap map;
     [SerializeField] private Tilemap snakeTile;
 
@@ -24,7 +31,8 @@ public class GameManager : MonoBehaviour
 
     private List<Vector2Int> snake = new List<Vector2Int>();
 
-    private Vector2Int currentDirection;
+    private Vector2Int currentInputDirection;
+    private Vector2Int lastMoveDirection;
 
     void Start()
     {
@@ -35,27 +43,43 @@ public class GameManager : MonoBehaviour
         input.NormalInput.Left.performed += HandleInput;
         input.NormalInput.Right.performed += HandleInput;
 
-        currentDirection = Vector2Int.right;
+        currentInputDirection = Vector2Int.right;
+        lastMoveDirection = Vector2Int.right;
         InitTilemap();
         InitSnake();
+
+        tickTimer = secondPerTick;
     }
 
 
     void Update()
     {
-        
+        tickTimer -= Time.deltaTime;
+        if(tickTimer < 0)
+        {
+            tickTimer = secondPerTick;
+            Tick();
+        }
     }
 
-    private void FixedUpdate()
+    private void Tick()
     {
         // 移动判断
-        Vector2Int targetPos = snake[0] + currentDirection;
+        Vector2Int targetPos = snake[0] + currentInputDirection;
         if (IsOutOfBoundary(targetPos))
             return;
+        lastMoveDirection = currentInputDirection;
         
         // 移动渲染
-        snake[0] = targetPos;
         snakeTile.ClearAllTiles();
+        for(int i = snake.Count-1; i > 0; i--)    // 蛇身
+        {
+            if (snake[i] == snake[i - 1]) continue;
+
+            snake[i] = snake[i - 1];
+            snakeTile.SetTile((Vector3Int)snake[i], snakeBody);
+        }
+        snake[0] = targetPos;   // 蛇头
         snakeTile.SetTile((Vector3Int)snake[0], snakeHead);
     }
 
@@ -66,9 +90,7 @@ public class GameManager : MonoBehaviour
 
     private bool IsOutOfBoundary(Vector2Int position)
     {
-        if (position.x < 0 || position.x >= width || position.y < 0 || position.y >= height)
-            return true;
-        return false;
+        return position.x < 0 || position.x >= width || position.y < 0 || position.y >= height;
     }
 
     private void InitTilemap()
@@ -100,9 +122,9 @@ public class GameManager : MonoBehaviour
 
     private void TryChangeDirection(Vector2Int dir)
     {
-        if (snake.Count > 1 && currentDirection == -dir)
+        if (snake.Count > 1 && lastMoveDirection == -dir)
             return;
-        currentDirection = dir;
+        currentInputDirection = dir;
     }
 
     private void InitSnake()
@@ -111,5 +133,16 @@ public class GameManager : MonoBehaviour
 
         snakeTile.SetTile((Vector3Int)snakeSpawnPoint, snakeHead);
         snake.Add(snakeSpawnPoint);
+
+        for(int i = 0; i < initialBodyLen; i++)
+        {
+            snakeTile.SetTile((Vector3Int)snakeSpawnPoint, snakeBody);
+            snake.Add(snakeSpawnPoint);
+        }
+    }
+
+    private void EatApple()
+    {
+
     }
 }

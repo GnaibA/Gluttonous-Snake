@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Ground
   m_EditorClassIdentifier: 
   m_Sprite: {fileID: 21300000, guid: e5a82405657e71c4faa63b9f85bce256, type: 3}
-  m_Color: {r: 0.4897946, g: 0.6914933, b: 0.7987421, a: 1}
+  m_Color: {r: 0.48427665, g: 0.47820804, b: 0, a: 1}
   m_Transform:
     e00: 1
     e01: 0
