@@ -21,6 +21,7 @@ public class GameManager : MonoBehaviour
     [Header("×ÊÔ´")]
     [SerializeField] private Tilemap map;
     [SerializeField] private Tilemap snakeTile;
+    [SerializeField] private Tilemap appleTile;
 
     [Header("ÍßÆ¬ËØ²Ä")]
     [SerializeField] private TileBase apple;
@@ -30,6 +31,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TileBase snakeHead;
 
     private List<Vector2Int> snake = new List<Vector2Int>();
+    [SerializeField] private Vector2Int applePos;
 
     private Vector2Int currentInputDirection;
     private Vector2Int lastMoveDirection;
@@ -45,12 +47,53 @@ public class GameManager : MonoBehaviour
 
         currentInputDirection = Vector2Int.right;
         lastMoveDirection = Vector2Int.right;
+
         InitTilemap();
         InitSnake();
+        SummonApple();
 
         tickTimer = secondPerTick;
     }
 
+    private void SummonApple()
+    {
+        ResetApplePosition();
+        DrawApple();
+    }
+
+    private void DrawApple()
+    {
+        appleTile.ClearAllTiles();
+        appleTile.SetTile((Vector3Int)applePos, apple);
+    }
+
+    private void ResetApplePosition()
+    {
+        HashSet<Vector2Int> snakeSet = new HashSet<Vector2Int>();
+        for (int i = 0; i < snake.Count; i++)
+        {
+            snakeSet.Add(snake[i]);
+        }
+
+        List<Vector2Int> freeCells = new List<Vector2Int>();
+        for (int i = 0; i < width; i++)
+        {
+            for (int j = 0; j < height; j++)
+            {
+                Vector2Int point = new Vector2Int(i, j);
+                if (!snakeSet.Contains(point))
+                    freeCells.Add(point);
+            }
+        }
+
+        applePos = freeCells[UnityEngine.Random.Range(0, freeCells.Count)];
+    }
+
+    private void EatApple()
+    {
+        SummonApple();
+        AddBodyLength();
+    }
 
     void Update()
     {
@@ -69,7 +112,11 @@ public class GameManager : MonoBehaviour
         if (IsOutOfBoundary(targetPos))
             return;
         lastMoveDirection = currentInputDirection;
-        
+
+        // ÊÇ·ñ³ÔµôÆ»¹û
+        if (targetPos == applePos)
+            EatApple();
+
         // ÒÆ¶¯äÖÈ¾
         snakeTile.ClearAllTiles();
         for(int i = snake.Count-1; i > 0; i--)    // ÉßÉí
@@ -85,6 +132,10 @@ public class GameManager : MonoBehaviour
 
     private void OnDisable()
     {
+        input.NormalInput.Up.performed -= HandleInput;
+        input.NormalInput.Down.performed -= HandleInput;
+        input.NormalInput.Left.performed -= HandleInput;
+        input.NormalInput.Right.performed -= HandleInput;
         input.NormalInput.Disable();
     }
 
@@ -141,8 +192,8 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private void EatApple()
+    private void AddBodyLength()
     {
-
+        snake.Add(snake[snake.Count - 1]);
     }
 }
