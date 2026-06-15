@@ -1,18 +1,28 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
 
 public class GameManager : MonoBehaviour
 {
     private PlayerInput input;
 
-    [Header("…Ë÷√")]
+    public enum GameState { Playing, GameOver};
+
+    [Header("”Œœ∑◊¥Ã¨")]
+    public GameState state = GameState.Playing;
+
+    public int score = 0;
+    public int highScore = 0;
+
+    public event Action OnGameOver;
+    public event Action OnRestart;
+
+    [Header("”Œœ∑…Ë÷√")]
     [SerializeField] public int width;
     [SerializeField] public int height;
-
     private float tickTimer;
     [SerializeField] private float secondPerTick = .3f;
 
@@ -31,6 +41,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TileBase snakeHead;
 
     private List<Vector2Int> snake = new List<Vector2Int>();
+    private HashSet<Vector2Int> snakeSet = new HashSet<Vector2Int>();
     [SerializeField] private Vector2Int applePos;
 
     private Vector2Int currentInputDirection;
@@ -69,12 +80,6 @@ public class GameManager : MonoBehaviour
 
     private void ResetApplePosition()
     {
-        HashSet<Vector2Int> snakeSet = new HashSet<Vector2Int>();
-        for (int i = 0; i < snake.Count; i++)
-        {
-            snakeSet.Add(snake[i]);
-        }
-
         List<Vector2Int> freeCells = new List<Vector2Int>();
         for (int i = 0; i < width; i++)
         {
@@ -91,12 +96,15 @@ public class GameManager : MonoBehaviour
 
     private void EatApple()
     {
+        score++;
         SummonApple();
         AddBodyLength();
     }
 
     void Update()
     {
+        if (state == GameState.GameOver) return;
+
         tickTimer -= Time.deltaTime;
         if(tickTimer < 0)
         {
@@ -109,13 +117,14 @@ public class GameManager : MonoBehaviour
     {
         // “∆∂Ø≈–∂œ
         Vector2Int targetPos = snake[0] + currentInputDirection;
-        if (IsOutOfBoundary(targetPos))
+        if (IsOutOfBoundary(targetPos) || snakeSet.Contains(targetPos))
+        {
+            GameOver();
             return;
+        }
         lastMoveDirection = currentInputDirection;
 
-        //  «∑Ò≥‘µÙ∆ªπ˚
-        if (targetPos == applePos)
-            EatApple();
+        Vector2Int snakeTail = snake[snake.Count - 1];
 
         // “∆∂Ø‰÷»æ
         snakeTile.ClearAllTiles();
@@ -128,6 +137,15 @@ public class GameManager : MonoBehaviour
         }
         snake[0] = targetPos;   // …ﬂÕ∑
         snakeTile.SetTile((Vector3Int)snake[0], snakeHead);
+
+        // ∏¸–¬snakeSet
+        snakeSet.Add(targetPos);
+        if (snake[snake.Count - 1] != snakeTail)
+            snakeSet.Remove(snakeTail);
+
+        //  «∑Ò≥‘µÙ∆ªπ˚
+        if (targetPos == applePos)
+            EatApple();
     }
 
     private void OnDisable()
@@ -182,18 +200,53 @@ public class GameManager : MonoBehaviour
     {
         Vector2Int snakeSpawnPoint = new Vector2Int(width / 2, height / 2);
 
-        snakeTile.SetTile((Vector3Int)snakeSpawnPoint, snakeHead);
-        snake.Add(snakeSpawnPoint);
-
         for(int i = 0; i < initialBodyLen; i++)
         {
             snakeTile.SetTile((Vector3Int)snakeSpawnPoint, snakeBody);
             snake.Add(snakeSpawnPoint);
         }
+
+        snakeTile.SetTile((Vector3Int)snakeSpawnPoint, snakeHead);
+        snake.Add(snakeSpawnPoint);
+
+        snakeSet.Add(snakeSpawnPoint);
     }
 
     private void AddBodyLength()
     {
         snake.Add(snake[snake.Count - 1]);
+    }
+
+    private void GameOver()
+    {
+        state = GameState.GameOver;
+
+        if (score > highScore) highScore = score;
+
+        OnGameOver?.Invoke();
+    }
+
+    public void Restart()
+    {
+        if (state == GameState.Playing) return; // ∑¿ŒÛ¥•∑¢ 
+
+        state = GameState.Playing;
+        score = 0;
+
+        currentInputDirection = Vector2Int.right;
+        lastMoveDirection = Vector2Int.right;
+
+        snake.Clear();
+        snakeSet.Clear();
+
+        snakeTile.ClearAllTiles();
+        appleTile.ClearAllTiles();
+
+        InitSnake();    
+        SummonApple();
+
+        tickTimer = secondPerTick;
+
+        OnRestart?.Invoke();
     }
 }
