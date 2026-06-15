@@ -8,7 +8,7 @@ using UnityEngine.UI;
 public class GameOverUI : MonoBehaviour
 {
     [SerializeField] private GameObject gameOverPanel;
-    [SerializeField] private Button restartButton;
+    [SerializeField] private Button restartButton;  
     [SerializeField] private TextMeshProUGUI scoreText;
     [SerializeField] private TextMeshProUGUI highScoreText;
     [SerializeField] private GameManager gameManager;
