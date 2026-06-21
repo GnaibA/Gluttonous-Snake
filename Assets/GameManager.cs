@@ -1,3 +1,4 @@
+using DG.Tweening;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -9,10 +10,11 @@ public class GameManager : MonoBehaviour
 {
     private PlayerInput input;
 
-    public enum GameState { Playing, GameOver};
+    public enum GameState { Playing, GameOver };
 
     [Header("游戏状态")]
     public GameState state = GameState.Playing;
+    [SerializeField] private float timeScale = 1f;
 
     public int score = 0;
     public int highScore = 0;
@@ -25,22 +27,19 @@ public class GameManager : MonoBehaviour
     [SerializeField] public int height;
     private float tickTimer;
     [SerializeField] private float secondPerTick = .3f;
-
     [SerializeField] private int initialBodyLen = 3;
 
     [Header("资源")]
     [SerializeField] private Tilemap map;
-    [SerializeField] private Tilemap snakeTile;
-    [SerializeField] private Tilemap appleTile;
 
     [Header("瓦片素材")]
-    [SerializeField] private TileBase apple;
     [SerializeField] private TileBase ground;
     [SerializeField] private TileBase boundary;
-    [SerializeField] private TileBase snakeBody;
-    [SerializeField] private TileBase snakeHead;
+    [SerializeField] private GameObject apple;
+    [SerializeField] private GameObject snakeHead;
+    [SerializeField] private GameObject snakeBody;
 
-    private List<Vector2Int> snake = new List<Vector2Int>();
+    private List<SnakeSegment> snake = new List<SnakeSegment>();
     private HashSet<Vector2Int> snakeSet = new HashSet<Vector2Int>();
     [SerializeField] private Vector2Int applePos;
 
@@ -57,13 +56,26 @@ public class GameManager : MonoBehaviour
         input.NormalInput.Right.performed += HandleInput;
 
         currentInputDirection = Vector2Int.right;
-        lastMoveDirection = Vector2Int.right;
+        lastMoveDirection = currentInputDirection;
 
         InitTilemap();
         InitSnake();
-        SummonApple();
+        InitApple();
 
         tickTimer = secondPerTick;
+
+        Time.timeScale = timeScale;
+    }
+
+    private void InitApple()
+    {
+        // 苹果动效
+        apple.transform.DOScale(1.5f, 1f).SetLoops(-1, LoopType.Yoyo);
+
+        apple.transform.rotation = Quaternion.Euler(0, 0, -30);
+        apple.transform.DORotate(new Vector3(0, 0, 30), 1.5f).SetLoops(-1, LoopType.Yoyo);
+
+        SummonApple();
     }
 
     private void SummonApple()
@@ -74,8 +86,7 @@ public class GameManager : MonoBehaviour
 
     private void DrawApple()
     {
-        appleTile.ClearAllTiles();
-        appleTile.SetTile((Vector3Int)applePos, apple);
+        apple.transform.position = (Vector3Int)applePos;
     }
 
     private void ResetApplePosition()
@@ -106,7 +117,7 @@ public class GameManager : MonoBehaviour
         if (state == GameState.GameOver) return;
 
         tickTimer -= Time.deltaTime;
-        if(tickTimer < 0)
+        if (tickTimer < 0)
         {
             tickTimer = secondPerTick;
             Tick();
@@ -116,7 +127,7 @@ public class GameManager : MonoBehaviour
     private void Tick()
     {
         // 移动判断
-        Vector2Int targetPos = snake[0] + currentInputDirection;
+        Vector2Int targetPos = snake[0].position + currentInputDirection;
         if (IsOutOfBoundary(targetPos) || snakeSet.Contains(targetPos))
         {
             GameOver();
@@ -124,23 +135,32 @@ public class GameManager : MonoBehaviour
         }
         lastMoveDirection = currentInputDirection;
 
-        Vector2Int snakeTail = snake[snake.Count - 1];
+        Vector2Int snakeTail = snake[snake.Count - 1].position;
 
-        // 移动渲染
-        snakeTile.ClearAllTiles();
-        for(int i = snake.Count-1; i > 0; i--)    // 蛇身
+        // 更新移动坐标
+        snake[0].direction = Vector2ToAngle(lastMoveDirection);
+        for (int i = snake.Count - 1; i > 0; i--)
         {
-            if (snake[i] == snake[i - 1]) continue;
+            snake[i].position = snake[i - 1].position;
 
-            snake[i] = snake[i - 1];
-            snakeTile.SetTile((Vector3Int)snake[i], snakeBody);
+            // TODO:修改角度
+            if (Mathf.Abs(snake[i].direction - snake[i - 1].direction) == 90)
+                snake[i].direction = snake[i - 1].direction * .7f;
+            else
+                snake[i].direction = snake[i - 1].direction;
         }
-        snake[0] = targetPos;   // 蛇头
-        snakeTile.SetTile((Vector3Int)snake[0], snakeHead);
+        snake[0].position = targetPos;
+
+        // 根据坐标渲染
+        for (int i = 0; i < snake.Count; i++)
+        {
+            snake[i].transform.DOMove((Vector3Int)snake[i].position, secondPerTick);
+            snake[i].transform.DORotate(new Vector3(0, 0, snake[i].direction), secondPerTick,RotateMode.Fast);
+        }
 
         // 更新snakeSet
         snakeSet.Add(targetPos);
-        if (snake[snake.Count - 1] != snakeTail)
+        if (snake[snake.Count - 1].position != snakeTail)
             snakeSet.Remove(snakeTail);
 
         // 是否吃掉苹果
@@ -200,21 +220,28 @@ public class GameManager : MonoBehaviour
     {
         Vector2Int snakeSpawnPoint = new Vector2Int(width / 2, height / 2);
 
-        for(int i = 0; i < initialBodyLen; i++)
-        {
-            snakeTile.SetTile((Vector3Int)snakeSpawnPoint, snakeBody);
-            snake.Add(snakeSpawnPoint);
-        }
+        // 初始化蛇头和蛇身
+        GameObject head = Instantiate(snakeHead);
+        head.transform.position = (Vector3Int)snakeSpawnPoint;
+        snake.Add(new SnakeSegment(snakeSpawnPoint, head.transform, Vector2ToAngle(lastMoveDirection)));
 
-        snakeTile.SetTile((Vector3Int)snakeSpawnPoint, snakeHead);
-        snake.Add(snakeSpawnPoint);
+        for (int i = 0; i < initialBodyLen; i++)
+        {
+            GameObject body = Instantiate(snakeBody);
+            body.transform.position = (Vector3Int)snakeSpawnPoint;
+            snake.Add(new SnakeSegment(snakeSpawnPoint, body.transform, Vector2ToAngle(lastMoveDirection)));
+        }
 
         snakeSet.Add(snakeSpawnPoint);
     }
 
     private void AddBodyLength()
     {
-        snake.Add(snake[snake.Count - 1]);
+        // 添加一节身体
+        SnakeSegment snakeTail = snake[snake.Count - 1];
+        GameObject body = Instantiate(snakeBody);
+        body.transform.position = (Vector3Int)snakeTail.position;
+        snake.Add(new SnakeSegment(snakeTail.position, body.transform, snakeTail.direction));
     }
 
     private void GameOver()
@@ -236,17 +263,27 @@ public class GameManager : MonoBehaviour
         currentInputDirection = Vector2Int.right;
         lastMoveDirection = Vector2Int.right;
 
-        snake.Clear();
+        ClearSnakeList(snake);
         snakeSet.Clear();
 
-        snakeTile.ClearAllTiles();
-        appleTile.ClearAllTiles();
-
-        InitSnake();    
-        SummonApple();
+        InitSnake();
+        InitApple();
 
         tickTimer = secondPerTick;
 
         OnRestart?.Invoke();
+    }
+
+    private void ClearSnakeList(List<SnakeSegment> snake)
+    {
+        foreach (var obj in snake)
+            Destroy(obj.transform.gameObject);
+
+        snake.Clear();
+    }
+
+    private float Vector2ToAngle(Vector2 dir)
+    {
+        return Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
     }
 }
